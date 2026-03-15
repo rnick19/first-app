@@ -33,10 +33,7 @@
       -webkit-text-fill-color: transparent;
     }
 
-    header p {
-      font-size: 0.8rem;
-      color: #64748b;
-    }
+    header p { font-size: 0.8rem; color: #64748b; }
 
     .controls {
       display: flex;
@@ -57,10 +54,8 @@
     }
 
     .btn:hover { border-color: #60a5fa; color: #60a5fa; }
-    .btn.active { background: #1e3a5f; border-color: #60a5fa; color: #60a5fa; }
-
-    .btn.sp500.active  { background: #1e3a5f; border-color: #60a5fa; color: #60a5fa; }
-    .btn.dji.active    { background: #2d1b4e; border-color: #a78bfa; color: #a78bfa; }
+    .btn.sp500.active { background: #1e3a5f; border-color: #60a5fa; color: #60a5fa; }
+    .btn.dji.active   { background: #2d1b4e; border-color: #a78bfa; color: #a78bfa; }
 
     .range-btns { margin-left: auto; display: flex; gap: 6px; }
     .range-btn {
@@ -131,31 +126,6 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    #error-msg {
-      display: none;
-      position: absolute;
-      inset: 0;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      gap: 10px;
-      text-align: center;
-      padding: 20px;
-      color: #f87171;
-    }
-
-    #error-msg p { color: #94a3b8; font-size: 0.85rem; max-width: 380px; }
-    #error-msg button {
-      margin-top: 8px;
-      padding: 8px 20px;
-      background: #1e3a5f;
-      border: 1px solid #60a5fa;
-      border-radius: 8px;
-      color: #60a5fa;
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-
     canvas { display: block; }
 
     footer {
@@ -187,73 +157,122 @@
   </div>
 </div>
 
-<div class="stats-row" id="stats-row">
-  <!-- filled by JS -->
-</div>
+<div class="stats-row" id="stats-row"></div>
 
 <div class="chart-container">
   <div id="loading">
     <div class="spinner"></div>
-    <span style="color:#64748b;font-size:0.85rem">Fetching market data…</span>
-  </div>
-  <div id="error-msg">
-    <strong>Could not load data</strong>
-    <p>The Yahoo Finance API may be blocked by your browser or network. Try disabling any ad-blockers / CORS extensions, or open this file from a local server.</p>
-    <button onclick="fetchAll()">Retry</button>
+    <span style="color:#64748b;font-size:0.85rem" id="loading-text">Fetching market data…</span>
   </div>
   <canvas id="myChart"></canvas>
 </div>
 
-<footer>Data sourced from Yahoo Finance · Prices are closing values (monthly) · For informational purposes only</footer>
+<footer id="footer-note">Data sourced from Yahoo Finance · Prices are monthly closing values · For informational purposes only</footer>
 
 <script>
-  const PROXIES = [
-    url => `https://query1.finance.yahoo.com/v8/finance/chart/${url}`,
-    url => `https://query2.finance.yahoo.com/v8/finance/chart/${url}`,
-  ];
-
-  const SYMBOLS = {
-    sp500: '^GSPC',
-    dji:   '^DJI',
+  // ── Embedded fallback data (monthly closes through Dec 2024) ──────────────
+  const FALLBACK = {
+    sp500: [
+      ['2015-01',1995],['2015-02',2105],['2015-03',2068],['2015-04',2086],['2015-05',2107],['2015-06',2063],
+      ['2015-07',2103],['2015-08',1972],['2015-09',1920],['2015-10',2079],['2015-11',2080],['2015-12',2044],
+      ['2016-01',1940],['2016-02',1932],['2016-03',2060],['2016-04',2065],['2016-05',2096],['2016-06',2099],
+      ['2016-07',2174],['2016-08',2171],['2016-09',2168],['2016-10',2126],['2016-11',2198],['2016-12',2239],
+      ['2017-01',2279],['2017-02',2364],['2017-03',2363],['2017-04',2384],['2017-05',2412],['2017-06',2423],
+      ['2017-07',2470],['2017-08',2472],['2017-09',2519],['2017-10',2575],['2017-11',2648],['2017-12',2674],
+      ['2018-01',2824],['2018-02',2714],['2018-03',2641],['2018-04',2648],['2018-05',2705],['2018-06',2718],
+      ['2018-07',2816],['2018-08',2901],['2018-09',2914],['2018-10',2712],['2018-11',2760],['2018-12',2507],
+      ['2019-01',2704],['2019-02',2784],['2019-03',2834],['2019-04',2946],['2019-05',2752],['2019-06',2942],
+      ['2019-07',2980],['2019-08',2926],['2019-09',2977],['2019-10',3037],['2019-11',3141],['2019-12',3231],
+      ['2020-01',3226],['2020-02',2954],['2020-03',2585],['2020-04',2912],['2020-05',3044],['2020-06',3100],
+      ['2020-07',3271],['2020-08',3500],['2020-09',3363],['2020-10',3270],['2020-11',3622],['2020-12',3756],
+      ['2021-01',3714],['2021-02',3811],['2021-03',3973],['2021-04',4181],['2021-05',4204],['2021-06',4298],
+      ['2021-07',4395],['2021-08',4523],['2021-09',4308],['2021-10',4605],['2021-11',4567],['2021-12',4766],
+      ['2022-01',4515],['2022-02',4374],['2022-03',4530],['2022-04',4132],['2022-05',4132],['2022-06',3785],
+      ['2022-07',4130],['2022-08',3955],['2022-09',3586],['2022-10',3872],['2022-11',4080],['2022-12',3840],
+      ['2023-01',4077],['2023-02',3970],['2023-03',4109],['2023-04',4169],['2023-05',4179],['2023-06',4450],
+      ['2023-07',4588],['2023-08',4508],['2023-09',4288],['2023-10',4193],['2023-11',4567],['2023-12',4769],
+      ['2024-01',4845],['2024-02',5137],['2024-03',5254],['2024-04',5035],['2024-05',5277],['2024-06',5460],
+      ['2024-07',5522],['2024-08',5648],['2024-09',5762],['2024-10',5705],['2024-11',5957],['2024-12',5882],
+    ],
+    dji: [
+      ['2015-01',17165],['2015-02',18133],['2015-03',17776],['2015-04',17840],['2015-05',18011],['2015-06',17620],
+      ['2015-07',17690],['2015-08',16528],['2015-09',16284],['2015-10',17664],['2015-11',17720],['2015-12',17425],
+      ['2016-01',16466],['2016-02',16516],['2016-03',17685],['2016-04',17773],['2016-05',17787],['2016-06',17930],
+      ['2016-07',18432],['2016-08',18401],['2016-09',18308],['2016-10',18142],['2016-11',19123],['2016-12',19763],
+      ['2017-01',19864],['2017-02',20812],['2017-03',20663],['2017-04',20941],['2017-05',21008],['2017-06',21350],
+      ['2017-07',21891],['2017-08',21948],['2017-09',22405],['2017-10',23377],['2017-11',23940],['2017-12',24719],
+      ['2018-01',26149],['2018-02',25029],['2018-03',24103],['2018-04',24163],['2018-05',24415],['2018-06',24271],
+      ['2018-07',25415],['2018-08',25965],['2018-09',26458],['2018-10',25115],['2018-11',25538],['2018-12',23327],
+      ['2019-01',25000],['2019-02',26027],['2019-03',25929],['2019-04',26593],['2019-05',24815],['2019-06',26600],
+      ['2019-07',26864],['2019-08',26403],['2019-09',26917],['2019-10',27046],['2019-11',28052],['2019-12',28538],
+      ['2020-01',28256],['2020-02',25409],['2020-03',21917],['2020-04',24346],['2020-05',25384],['2020-06',25813],
+      ['2020-07',26429],['2020-08',28430],['2020-09',27781],['2020-10',26502],['2020-11',29639],['2020-12',30606],
+      ['2021-01',29983],['2021-02',31494],['2021-03',32981],['2021-04',33875],['2021-05',34529],['2021-06',34503],
+      ['2021-07',35121],['2021-08',35361],['2021-09',33844],['2021-10',35820],['2021-11',34483],['2021-12',36338],
+      ['2022-01',35132],['2022-02',33895],['2022-03',34678],['2022-04',32977],['2022-05',32990],['2022-06',30775],
+      ['2022-07',32845],['2022-08',31510],['2022-09',28726],['2022-10',32732],['2022-11',34589],['2022-12',33147],
+      ['2023-01',34086],['2023-02',32657],['2023-03',33274],['2023-04',34098],['2023-05',33093],['2023-06',34408],
+      ['2023-07',35560],['2023-08',34722],['2023-09',33507],['2023-10',33052],['2023-11',35950],['2023-12',37690],
+      ['2024-01',38150],['2024-02',39087],['2024-03',39807],['2024-04',37815],['2024-05',38686],['2024-06',39118],
+      ['2024-07',40743],['2024-08',41563],['2024-09',42330],['2024-10',41763],['2024-11',44910],['2024-12',42544],
+    ],
   };
 
+  function parseFallback(key) {
+    return FALLBACK[key].map(([ym, y]) => ({
+      x: new Date(ym + '-01'),
+      y,
+    }));
+  }
+
+  // ── Live fetch via CORS proxies ───────────────────────────────────────────
+  const YF_PARAMS = '?interval=1mo&range=10y';
+
+  function makeProxies(sym) {
+    const encoded = encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}${YF_PARAMS}`);
+    return [
+      `https://corsproxy.io/?url=${encoded}`,
+      `https://api.allorigins.win/raw?url=${encoded}`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}${YF_PARAMS}`,
+      `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}${YF_PARAMS}`,
+    ];
+  }
+
+  const SYMBOLS = { sp500: '^GSPC', dji: '^DJI' };
+
+  async function fetchSymbol(key) {
+    const urls = makeProxies(SYMBOLS[key]);
+    for (const url of urls) {
+      try {
+        const resp = await fetch(url, { mode: 'cors' });
+        if (!resp.ok) continue;
+        const json = await resp.json();
+        const result = json?.chart?.result?.[0];
+        if (!result) continue;
+        const closes = result.indicators.quote[0].close;
+        return result.timestamp.map((t, i) => ({
+          x: new Date(t * 1000),
+          y: closes[i] != null ? Math.round(closes[i] * 100) / 100 : null,
+        })).filter(d => d.y !== null);
+      } catch(_) {}
+    }
+    return null; // signal: use fallback
+  }
+
+  // ── App state ─────────────────────────────────────────────────────────────
   const COLORS = {
     sp500: { line: '#60a5fa', fill: 'rgba(96,165,250,0.08)' },
     dji:   { line: '#a78bfa', fill: 'rgba(167,139,250,0.08)' },
   };
 
-  let rawData   = { sp500: [], dji: [] };
-  let chartInst = null;
-  let visible   = { sp500: true, dji: true };
+  let rawData      = { sp500: [], dji: [] };
+  let chartInst    = null;
+  let visible      = { sp500: true, dji: true };
   let currentRange = '10y';
-
-  async function fetchSymbol(key) {
-    const sym    = encodeURIComponent(SYMBOLS[key]);
-    const params = `?interval=1mo&range=10y`;
-    let lastErr;
-    for (const proxy of PROXIES) {
-      try {
-        const url  = proxy(sym) + params;
-        const resp = await fetch(url, { mode: 'cors' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const json = await resp.json();
-        const result = json?.chart?.result?.[0];
-        if (!result) throw new Error('No data in response');
-        const timestamps = result.timestamp;
-        const closes     = result.indicators.quote[0].close;
-        return timestamps.map((t, i) => ({
-          x: new Date(t * 1000),
-          y: closes[i] != null ? Math.round(closes[i] * 100) / 100 : null,
-        })).filter(d => d.y !== null);
-      } catch(e) { lastErr = e; }
-    }
-    throw lastErr;
-  }
 
   function filterByRange(data, range) {
     const cutoff = new Date();
-    const years = { '1y': 1, '3y': 3, '5y': 5, '10y': 10 }[range] ?? 10;
-    cutoff.setFullYear(cutoff.getFullYear() - years);
+    cutoff.setFullYear(cutoff.getFullYear() - ({ '1y':1,'3y':3,'5y':5,'10y':10 }[range] ?? 10));
     return data.filter(d => d.x >= cutoff);
   }
 
@@ -264,19 +283,18 @@
       const d = filterByRange(rawData[key], currentRange);
       if (!d.length) continue;
       const first = d[0].y, last = d[d.length-1].y;
-      const pct   = ((last - first) / first * 100).toFixed(1);
-      const cls   = pct >= 0 ? 'positive' : 'negative';
-      const sign  = pct >= 0 ? '+' : '';
+      const pct  = ((last - first) / first * 100).toFixed(1);
+      const cls  = pct >= 0 ? 'positive' : 'negative';
+      const sign = pct >= 0 ? '+' : '';
       row.insertAdjacentHTML('beforeend', `
         <div class="stat-card">
           <div class="label">${label}</div>
-          <div class="value" style="color:${COLORS[key].line}">${last.toLocaleString('en-US', {maximumFractionDigits:0})}</div>
+          <div class="value" style="color:${COLORS[key].line}">${last.toLocaleString('en-US',{maximumFractionDigits:0})}</div>
           <div class="change ${cls}">${sign}${pct}% (${currentRange})</div>
         </div>
       `);
     }
-    // last updated
-    const allDates = [...(rawData.sp500||[])].map(d=>d.x);
+    const allDates = rawData.sp500.map(d => d.x);
     if (allDates.length) {
       const latest = new Date(Math.max(...allDates));
       document.getElementById('last-updated').textContent =
@@ -286,13 +304,11 @@
 
   function renderChart() {
     const ctx = document.getElementById('myChart').getContext('2d');
-
     const datasets = [];
     for (const [key, label] of [['sp500','S&P 500 (^GSPC)'],['dji','Dow Jones (^DJI)']]) {
-      const d = filterByRange(rawData[key], currentRange);
       datasets.push({
         label,
-        data: d,
+        data: filterByRange(rawData[key], currentRange),
         borderColor: COLORS[key].line,
         backgroundColor: COLORS[key].fill,
         fill: true,
@@ -304,9 +320,7 @@
         yAxisID: key === 'sp500' ? 'ySP' : 'yDJI',
       });
     }
-
     if (chartInst) { chartInst.destroy(); chartInst = null; }
-
     chartInst = new Chart(ctx, {
       type: 'line',
       data: { datasets },
@@ -326,7 +340,7 @@
             titleColor: '#e2e8f0',
             bodyColor: '#94a3b8',
             callbacks: {
-              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('en-US',{maximumFractionDigits:0})}`,
             }
           },
         },
@@ -338,25 +352,15 @@
             ticks: { color: '#64748b', maxTicksLimit: 10 },
           },
           ySP: {
-            type: 'linear',
-            position: 'left',
-            display: visible.sp500,
+            type: 'linear', position: 'left', display: visible.sp500,
             grid: { color: '#334155' },
-            ticks: {
-              color: '#60a5fa',
-              callback: v => v.toLocaleString('en-US', { maximumFractionDigits: 0 }),
-            },
+            ticks: { color: '#60a5fa', callback: v => v.toLocaleString('en-US',{maximumFractionDigits:0}) },
             title: { display: true, text: 'S&P 500', color: '#60a5fa', font: { size: 11 } },
           },
           yDJI: {
-            type: 'linear',
-            position: 'right',
-            display: visible.dji,
+            type: 'linear', position: 'right', display: visible.dji,
             grid: { drawOnChartArea: false },
-            ticks: {
-              color: '#a78bfa',
-              callback: v => v.toLocaleString('en-US', { maximumFractionDigits: 0 }),
-            },
+            ticks: { color: '#a78bfa', callback: v => v.toLocaleString('en-US',{maximumFractionDigits:0}) },
             title: { display: true, text: 'Dow Jones', color: '#a78bfa', font: { size: 11 } },
           },
         },
@@ -380,25 +384,25 @@
   }
 
   async function fetchAll() {
-    document.getElementById('loading').style.display  = 'flex';
-    document.getElementById('error-msg').style.display = 'none';
+    document.getElementById('loading').style.display = 'flex';
 
-    try {
-      const [sp, dji] = await Promise.all([
-        fetchSymbol('sp500'),
-        fetchSymbol('dji'),
-      ]);
-      rawData.sp500 = sp;
-      rawData.dji   = dji;
+    const [spLive, djiLive] = await Promise.all([
+      fetchSymbol('sp500'),
+      fetchSymbol('dji'),
+    ]);
 
-      document.getElementById('loading').style.display = 'none';
-      buildStats();
-      renderChart();
-    } catch(e) {
-      console.error(e);
-      document.getElementById('loading').style.display  = 'none';
-      document.getElementById('error-msg').style.display = 'flex';
+    const usedFallback = !spLive || !djiLive;
+    rawData.sp500 = spLive  || parseFallback('sp500');
+    rawData.dji   = djiLive || parseFallback('dji');
+
+    if (usedFallback) {
+      document.getElementById('footer-note').textContent =
+        'Embedded historical data (Jan 2015 – Dec 2024) · Live data unavailable · For informational purposes only';
     }
+
+    document.getElementById('loading').style.display = 'none';
+    buildStats();
+    renderChart();
   }
 
   fetchAll();
