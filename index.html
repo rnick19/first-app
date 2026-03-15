@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S&P 500 & Dow Jones – Last 10 Years</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 24px 32px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    header p {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 16px 32px 0;
+    }
+
+    .btn {
+      padding: 6px 16px;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s;
+    }
+
+    .btn:hover { border-color: #60a5fa; color: #60a5fa; }
+    .btn.active { background: #1e3a5f; border-color: #60a5fa; color: #60a5fa; }
+
+    .btn.sp500.active  { background: #1e3a5f; border-color: #60a5fa; color: #60a5fa; }
+    .btn.dji.active    { background: #2d1b4e; border-color: #a78bfa; color: #a78bfa; }
+
+    .range-btns { margin-left: auto; display: flex; gap: 6px; }
+    .range-btn {
+      padding: 5px 12px;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      background: transparent;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 0.75rem;
+      transition: all 0.2s;
+    }
+    .range-btn:hover { border-color: #94a3b8; color: #e2e8f0; }
+    .range-btn.active { background: #1e293b; border-color: #94a3b8; color: #e2e8f0; }
+
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      padding: 16px 32px 0;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 12px 20px;
+      min-width: 160px;
+    }
+
+    .stat-card .label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat-card .value { font-size: 1.2rem; font-weight: 700; margin-top: 2px; }
+    .stat-card .change { font-size: 0.75rem; margin-top: 2px; }
+    .positive { color: #34d399; }
+    .negative { color: #f87171; }
+
+    .chart-container {
+      margin: 20px 32px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 20px;
+      position: relative;
+      height: 420px;
+    }
+
+    #loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #1e293b;
+      border-radius: 14px;
+      gap: 12px;
+      z-index: 10;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid #334155;
+      border-top-color: #60a5fa;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #error-msg {
+      display: none;
+      position: absolute;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 10px;
+      text-align: center;
+      padding: 20px;
+      color: #f87171;
+    }
+
+    #error-msg p { color: #94a3b8; font-size: 0.85rem; max-width: 380px; }
+    #error-msg button {
+      margin-top: 8px;
+      padding: 8px 20px;
+      background: #1e3a5f;
+      border: 1px solid #60a5fa;
+      border-radius: 8px;
+      color: #60a5fa;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    canvas { display: block; }
+
+    footer {
+      text-align: center;
+      padding: 16px;
+      font-size: 0.72rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>S&P 500 &amp; Dow Jones Industrial Average</h1>
+    <p id="last-updated">Historical performance – last 10 years</p>
+  </div>
+</header>
+
+<div class="controls">
+  <button class="btn sp500 active" id="toggle-sp500" onclick="toggleIndex('sp500')">S&amp;P 500 (^GSPC)</button>
+  <button class="btn dji active"   id="toggle-dji"   onclick="toggleIndex('dji')">Dow Jones (^DJI)</button>
+
+  <div class="range-btns">
+    <button class="range-btn" onclick="setRange('1y')">1Y</button>
+    <button class="range-btn" onclick="setRange('3y')">3Y</button>
+    <button class="range-btn" onclick="setRange('5y')">5Y</button>
+    <button class="range-btn active" onclick="setRange('10y')">10Y</button>
+  </div>
+</div>
+
+<div class="stats-row" id="stats-row">
+  <!-- filled by JS -->
+</div>
+
+<div class="chart-container">
+  <div id="loading">
+    <div class="spinner"></div>
+    <span style="color:#64748b;font-size:0.85rem">Fetching market data…</span>
+  </div>
+  <div id="error-msg">
+    <strong>Could not load data</strong>
+    <p>The Yahoo Finance API may be blocked by your browser or network. Try disabling any ad-blockers / CORS extensions, or open this file from a local server.</p>
+    <button onclick="fetchAll()">Retry</button>
+  </div>
+  <canvas id="myChart"></canvas>
+</div>
+
+<footer>Data sourced from Yahoo Finance · Prices are closing values (monthly) · For informational purposes only</footer>
+
+<script>
+  const PROXIES = [
+    url => `https://query1.finance.yahoo.com/v8/finance/chart/${url}`,
+    url => `https://query2.finance.yahoo.com/v8/finance/chart/${url}`,
+  ];
+
+  const SYMBOLS = {
+    sp500: '^GSPC',
+    dji:   '^DJI',
+  };
+
+  const COLORS = {
+    sp500: { line: '#60a5fa', fill: 'rgba(96,165,250,0.08)' },
+    dji:   { line: '#a78bfa', fill: 'rgba(167,139,250,0.08)' },
+  };
+
+  let rawData   = { sp500: [], dji: [] };
+  let chartInst = null;
+  let visible   = { sp500: true, dji: true };
+  let currentRange = '10y';
+
+  async function fetchSymbol(key) {
+    const sym    = encodeURIComponent(SYMBOLS[key]);
+    const params = `?interval=1mo&range=10y`;
+    let lastErr;
+    for (const proxy of PROXIES) {
+      try {
+        const url  = proxy(sym) + params;
+        const resp = await fetch(url, { mode: 'cors' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const json = await resp.json();
+        const result = json?.chart?.result?.[0];
+        if (!result) throw new Error('No data in response');
+        const timestamps = result.timestamp;
+        const closes     = result.indicators.quote[0].close;
+        return timestamps.map((t, i) => ({
+          x: new Date(t * 1000),
+          y: closes[i] != null ? Math.round(closes[i] * 100) / 100 : null,
+        })).filter(d => d.y !== null);
+      } catch(e) { lastErr = e; }
+    }
+    throw lastErr;
+  }
+
+  function filterByRange(data, range) {
+    const cutoff = new Date();
+    const years = { '1y': 1, '3y': 3, '5y': 5, '10y': 10 }[range] ?? 10;
+    cutoff.setFullYear(cutoff.getFullYear() - years);
+    return data.filter(d => d.x >= cutoff);
+  }
+
+  function buildStats() {
+    const row = document.getElementById('stats-row');
+    row.innerHTML = '';
+    for (const [key, label] of [['sp500','S&P 500'],['dji','Dow Jones']]) {
+      const d = filterByRange(rawData[key], currentRange);
+      if (!d.length) continue;
+      const first = d[0].y, last = d[d.length-1].y;
+      const pct   = ((last - first) / first * 100).toFixed(1);
+      const cls   = pct >= 0 ? 'positive' : 'negative';
+      const sign  = pct >= 0 ? '+' : '';
+      row.insertAdjacentHTML('beforeend', `
+        <div class="stat-card">
+          <div class="label">${label}</div>
+          <div class="value" style="color:${COLORS[key].line}">${last.toLocaleString('en-US', {maximumFractionDigits:0})}</div>
+          <div class="change ${cls}">${sign}${pct}% (${currentRange})</div>
+        </div>
+      `);
+    }
+    // last updated
+    const allDates = [...(rawData.sp500||[])].map(d=>d.x);
+    if (allDates.length) {
+      const latest = new Date(Math.max(...allDates));
+      document.getElementById('last-updated').textContent =
+        `Data through ${latest.toLocaleDateString('en-US',{month:'long',year:'numeric'})}`;
+    }
+  }
+
+  function renderChart() {
+    const ctx = document.getElementById('myChart').getContext('2d');
+
+    const datasets = [];
+    for (const [key, label] of [['sp500','S&P 500 (^GSPC)'],['dji','Dow Jones (^DJI)']]) {
+      const d = filterByRange(rawData[key], currentRange);
+      datasets.push({
+        label,
+        data: d,
+        borderColor: COLORS[key].line,
+        backgroundColor: COLORS[key].fill,
+        fill: true,
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        borderWidth: 2,
+        hidden: !visible[key],
+        yAxisID: key === 'sp500' ? 'ySP' : 'yDJI',
+      });
+    }
+
+    if (chartInst) { chartInst.destroy(); chartInst = null; }
+
+    chartInst = new Chart(ctx, {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: { color: '#94a3b8', boxWidth: 12, padding: 16, font: { size: 12 } },
+          },
+          tooltip: {
+            backgroundColor: '#1e293b',
+            borderColor: '#334155',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#94a3b8',
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+            }
+          },
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: currentRange === '1y' ? 'month' : 'year', tooltipFormat: 'MMM yyyy' },
+            grid: { color: '#1e293b' },
+            ticks: { color: '#64748b', maxTicksLimit: 10 },
+          },
+          ySP: {
+            type: 'linear',
+            position: 'left',
+            display: visible.sp500,
+            grid: { color: '#334155' },
+            ticks: {
+              color: '#60a5fa',
+              callback: v => v.toLocaleString('en-US', { maximumFractionDigits: 0 }),
+            },
+            title: { display: true, text: 'S&P 500', color: '#60a5fa', font: { size: 11 } },
+          },
+          yDJI: {
+            type: 'linear',
+            position: 'right',
+            display: visible.dji,
+            grid: { drawOnChartArea: false },
+            ticks: {
+              color: '#a78bfa',
+              callback: v => v.toLocaleString('en-US', { maximumFractionDigits: 0 }),
+            },
+            title: { display: true, text: 'Dow Jones', color: '#a78bfa', font: { size: 11 } },
+          },
+        },
+      }
+    });
+  }
+
+  function toggleIndex(key) {
+    visible[key] = !visible[key];
+    document.getElementById(`toggle-${key}`).classList.toggle('active', visible[key]);
+    renderChart();
+  }
+
+  function setRange(r) {
+    currentRange = r;
+    document.querySelectorAll('.range-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent === r.toUpperCase());
+    });
+    buildStats();
+    renderChart();
+  }
+
+  async function fetchAll() {
+    document.getElementById('loading').style.display  = 'flex';
+    document.getElementById('error-msg').style.display = 'none';
+
+    try {
+      const [sp, dji] = await Promise.all([
+        fetchSymbol('sp500'),
+        fetchSymbol('dji'),
+      ]);
+      rawData.sp500 = sp;
+      rawData.dji   = dji;
+
+      document.getElementById('loading').style.display = 'none';
+      buildStats();
+      renderChart();
+    } catch(e) {
+      console.error(e);
+      document.getElementById('loading').style.display  = 'none';
+      document.getElementById('error-msg').style.display = 'flex';
+    }
+  }
+
+  fetchAll();
+</script>
+</body>
+</html>
